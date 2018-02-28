@@ -1,0 +1,32 @@
+##############################################################################
+# Copyright (c) 2017 Huawei Technologies Co.,Ltd and others.
+#
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+##############################################################################
+---
+
+schema: "yardstick:task:0.1"
+description: >
+    Yardstick TC075 config file;
+    Measure network capacity and scale.
+    Measure number of connections, number of frames received;
+
+{% set host = host or "node1.LF" %}
+{% set file = file or '/etc/yardstick/pod.yaml' %}
+
+scenarios:
+-
+  type: NetworkCapacity
+  host: {{host}}
+
+  runner:
+    type: Iteration
+    iterations: 1
+
+context:
+  type: Node
+  name: LF
+  file: {{file}}

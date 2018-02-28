@@ -1,0 +1,39 @@
+##############################################################################
+# Copyright (c) 2017 Huawei Technologies Co.,Ltd and others.
+#
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+##############################################################################
+---
+
+schema: "yardstick:task:0.1"
+description: >
+    Yardstick TC055 config file;
+    Collect hardware specification from /proc/cpuinfo /proc/meminfo;
+    compute capacity and scale.
+    the results have,
+    number of CPUs, number of physical cores in a single CPU;
+    number of logical cores, total memory size;
+    cache size per CPU, total cache size;
+    HT (Hyper-Thread) support status, 1 for open, 0 for close.
+
+{% set host = host or "node5.yardstick-TC055" %}
+{% set file = file or '/etc/yardstick/pod.yaml' %}
+scenarios:
+-
+  type: ComputeCapacity
+  options:
+
+  nodes:
+    host: {{host}}
+
+  runner:
+    type: Iteration
+    iterations: 1
+
+context:
+  type: Node
+  name: yardstick-TC055
+  file: {{file}}

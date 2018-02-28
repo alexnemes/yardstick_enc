@@ -1,0 +1,159 @@
+##############################################################################
+# Copyright (c) 2017 14_ykl@tongji.edu.cn and others.
+#
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+##############################################################################
+---
+
+schema: "yardstick:task:0.1"
+description: >
+    Test case for TC050 :OpenStack Controller Node Network High Availability;
+    This test case is written by new scenario-based HA testing framework.
+
+{% set file = file or '/etc/yardstick/pod.yaml' %}
+{% set external_net = external_net or 'br-ex' %}
+{% set management_net = management_net or 'br-mgmt' %}
+{% set storage_net = storage_net or 'br-storage' %}
+{% set internal_net = internal_net or 'br-mesh' %}
+
+scenarios:
+  -
+    type: "GeneralHA"
+    options:
+      attackers:
+        -
+          fault_type: "general-attacker"
+          host: node1
+          key: "close-br-public"
+          attack_key: "close-interface"
+          action_parameter:
+            interface: {{external_net}}
+          rollback_parameter:
+            interface: {{external_net}}
+
+        -
+          fault_type: "general-attacker"
+          host: node1
+          key: "close-br-mgmt"
+          attack_key: "close-interface"
+          action_parameter:
+            interface: {{management_net}}
+          rollback_parameter:
+            interface: {{management_net}}
+
+        -
+          fault_type: "general-attacker"
+          host: node1
+          key: "close-br-storage"
+          attack_key: "close-interface"
+          action_parameter:
+            interface: {{storage_net}}
+          rollback_parameter:
+            interface: {{storage_net}}
+
+        -
+          fault_type: "general-attacker"
+          host: node1
+          key: "close-br-private"
+          attack_key: "close-interface"
+          action_parameter:
+            interface: {{internal_net}}
+          rollback_parameter:
+            interface: {{internal_net}}
+
+      monitors:
+        -
+          monitor_type: "openstack-cmd"
+          key: "nova-image-list"
+          command_name: "openstack image list"
+          monitor_time: 10
+          monitor_number: 3
+          sla:
+            max_outage_time: 5
+
+        -
+          monitor_type: "openstack-cmd"
+          key: "neutron-router-list"
+          command_name: "openstack router list"
+          monitor_time: 10
+          monitor_number: 3
+          sla:
+            max_outage_time: 5
+
+        -
+          monitor_type: "openstack-cmd"
+          key: "heat-stack-list"
+          command_name: "openstack stack list"
+          monitor_time: 10
+          monitor_number: 3
+          sla:
+            max_outage_time: 5
+
+        -
+          monitor_type: "openstack-cmd"
+          key: "cinder-list"
+          command_name: "openstack volume list"
+          monitor_time: 10
+          monitor_number: 3
+          sla:
+            max_outage_time: 5
+
+
+      steps:
+        -
+          actionKey: "close-br-public"
+          actionType: "attacker"
+          index: 1
+
+        -
+          actionKey: "close-br-mgmt"
+          actionType: "attacker"
+          index: 2
+
+        -
+          actionKey: "close-br-storage"
+          actionType: "attacker"
+          index: 3
+
+        -
+          actionKey: "close-br-private"
+          actionType: "attacker"
+          index: 4
+
+        -
+          actionKey: "nova-image-list"
+          actionType: "monitor"
+          index: 5
+
+        -
+          actionKey: "neutron-router-list"
+          actionType: "monitor"
+          index: 6
+
+        -
+          actionKey: "heat-stack-list"
+          actionType: "monitor"
+          index: 7
+
+        -
+          actionKey: "cinder-list"
+          actionType: "monitor"
+          index: 8
+
+
+    nodes:
+      node1: node1.LF
+    runner:
+      type: Duration
+      duration: 1
+    sla:
+      outage_time: 5
+      action: monitor
+
+context:
+  type: Node
+  name: LF
+  file: {{file}}

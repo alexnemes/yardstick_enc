@@ -1,0 +1,48 @@
+##############################################################################
+# Copyright (c) 2017 Huawei Technologies Co.,Ltd and others.
+#
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+##############################################################################
+---
+
+schema: "yardstick:task:0.1"
+description: >
+    Yardstick TC027 config file;
+    Measure IPV6 network latency using ping6.
+
+{% set openrc = openrc or "/opt/admin-openrc.sh" %}
+{% set external_network = external_network or "ext-net" %}
+{% set file = file or '/etc/yardstick/pod.yaml' %}
+scenarios:
+-
+  type: Ping6
+  options:
+    packetsize: 56
+    ping_count: 5
+    host: host1,host2,host3,host4,host5
+    openrc: {{openrc}}
+    external_network: {{external_network}}
+  nodes:
+    host1: node1.IPV6
+    host2: node2.IPV6
+    host3: node3.IPV6
+    host4: node4.IPV6
+    host5: node5.IPV6
+  runner:
+    type: Iteration
+    iterations: 1
+    interval: 1
+    run_step: 'setup,run,teardown'
+  sla:
+    max_rtt: 30
+    action: monitor
+
+
+context:
+  type: Node
+  name: IPV6
+  file: {{file}}
+

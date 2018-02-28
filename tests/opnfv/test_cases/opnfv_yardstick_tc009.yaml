@@ -1,0 +1,73 @@
+##############################################################################
+# Copyright (c) 2017 Ericsson AB and others.
+#
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+##############################################################################
+---
+
+schema: "yardstick:task:0.1"
+description: >
+    Yardstick TC009 config file;
+    Measure network throughput and packet loss using pktgen;
+    Different amounts of flows are tested with, from 2 up to 1001000;
+    All tests are run 10 times each. First 10 times with the least
+    amount of ports, then 10 times with the next amount of ports,
+    and so on until all packet sizes have been run with;
+
+{% set provider = provider or none %}
+{% set physical_network = physical_network or 'physnet1' %}
+{% set segmentation_id = segmentation_id or none %}
+
+scenarios:
+{% for num_ports in [1, 10, 50, 100, 500, 1000] %}
+-
+  type: Pktgen
+  options:
+    packetsize: 64
+    number_of_ports: {{num_ports}}
+    duration: 20
+
+  host: demeter.yardstick-TC009
+  target: poseidon.yardstick-TC009
+
+  runner:
+    type: Iteration
+    iterations: 10
+    interval: 1
+
+  sla:
+    max_ppm: 1000
+    action: monitor
+{% endfor %}
+
+context:
+  name: yardstick-TC009
+  image: yardstick-image
+  flavor: yardstick-flavor
+  user: ubuntu
+
+  placement_groups:
+    pgrp1:
+      policy: "availability"
+
+  servers:
+    demeter:
+      floating_ip: true
+      placement: "pgrp1"
+    poseidon:
+      floating_ip: true
+      placement: "pgrp1"
+
+  networks:
+    test:
+      cidr: '10.0.1.0/24'
+      {% if provider == "vlan" %}
+      provider: {{provider}}
+      physical_network: {{physical_network}}
+        {% if segmentation_id %}
+      segmentation_id: {{segmentation_id}}
+        {% endif %}
+      {% endif %}

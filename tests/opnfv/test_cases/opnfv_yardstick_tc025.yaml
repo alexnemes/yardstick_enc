@@ -1,0 +1,75 @@
+##############################################################################
+# Copyright (c) 2017 Huawei Technologies Co.,Ltd and others.
+#
+# All rights reserved. This program and the accompanying materials
+# are made available under the terms of the Apache License, Version 2.0
+# which accompanies this distribution, and is available at
+# http://www.apache.org/licenses/LICENSE-2.0
+##############################################################################
+---
+
+schema: "yardstick:task:0.1"
+description: >
+    Sample test case for the HA of OpenStack Controll Node abnormally shutdown.
+    In order to power on the shutdown node after testing, the jumphost is
+    required to install ipmitool. Ipmi jumphost info and each nodes' ipmi ip,
+    username, password are needed in pod file (There is a sample pod file in
+    "etc/yardstick/nodes/pod.yaml.ipmi.sample").
+
+{% set file = file or '/etc/yardstick/pod.yaml' %}
+{% set jump_host = jump_host or 'node0' %}
+{% set attack_host = attack_host or 'node1' %}
+{% set monitor_time = monitor_time or 180 %}
+
+scenarios:
+-
+  type: ServiceHA
+  options:
+    attackers:
+    - fault_type: "bare-metal-down"
+      host: {{attack_host}}
+      jump_host: {{jump_host}}
+
+    monitors:
+    - monitor_type: "openstack-cmd"
+      command_name: "openstack image list"
+      monitor_time: {{monitor_time}}
+      monitor_number: 3
+      sla:
+        max_outage_time: 5
+    - monitor_type: "openstack-cmd"
+      command_name: "openstack router list"
+      monitor_time: {{monitor_time}}
+      monitor_number: 3
+      sla:
+        max_outage_time: 5
+    - monitor_type: "openstack-cmd"
+      command_name: "openstack stack list"
+      monitor_time: {{monitor_time}}
+      monitor_number: 3
+      sla:
+        max_outage_time: 5
+    - monitor_type: "openstack-cmd"
+      command_name: "openstack volume list"
+      monitor_time: {{monitor_time}}
+      monitor_number: 3
+      sla:
+        max_outage_time: 5
+
+  nodes:
+    {{attack_host}}: {{attack_host}}.LF
+    {{jump_host}}: {{jump_host}}.LF
+
+  runner:
+    type: Iteration
+    iterations: 1
+
+  sla:
+    outage_time: 5
+    action: monitor
+
+
+context:
+  type: Node
+  name: LF
+  file: {{file}}
