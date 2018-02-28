@@ -18,7 +18,6 @@ import unittest
 import mock
 from oslo_serialization import jsonutils
 
-from yardstick.common import utils
 from yardstick.benchmark.scenarios.compute import ramspeed
 
 
@@ -78,7 +77,7 @@ class RamspeedTestCase(unittest.TestCase):
  "Block_size(kb)": 32768, "Bandwidth(MBps)": 8340.85}]}'
         mock_ssh.SSH.from_node().execute.return_value = (0, sample_output, '')
         r.run(self.result)
-        expected_result = utils.flatten_dict_key(jsonutils.loads(sample_output))
+        expected_result = jsonutils.loads(sample_output)
         self.assertEqual(self.result, expected_result)
 
     def test_ramspeed_successful_run_sla(self, mock_ssh):
@@ -114,7 +113,7 @@ class RamspeedTestCase(unittest.TestCase):
  "Block_size(kb)": 32768, "Bandwidth(MBps)": 8340.85}]}'
         mock_ssh.SSH.from_node().execute.return_value = (0, sample_output, '')
         r.run(self.result)
-        expected_result = utils.flatten_dict_key(jsonutils.loads(sample_output))
+        expected_result = jsonutils.loads(sample_output)
         self.assertEqual(self.result, expected_result)
 
     def test_ramspeed_unsuccessful_run_sla(self, mock_ssh):
@@ -180,7 +179,7 @@ class RamspeedTestCase(unittest.TestCase):
  "Bandwidth(MBps)": 9401.58}]}'
         mock_ssh.SSH.from_node().execute.return_value = (0, sample_output, '')
         r.run(self.result)
-        expected_result = utils.flatten_dict_key(jsonutils.loads(sample_output))
+        expected_result = jsonutils.loads(sample_output)
         self.assertEqual(self.result, expected_result)
 
     def test_ramspeed_mem_successful_run_sla(self, mock_ssh):
@@ -201,7 +200,7 @@ class RamspeedTestCase(unittest.TestCase):
  "Bandwidth(MBps)": 9401.58}]}'
         mock_ssh.SSH.from_node().execute.return_value = (0, sample_output, '')
         r.run(self.result)
-        expected_result = utils.flatten_dict_key(jsonutils.loads(sample_output))
+        expected_result = jsonutils.loads(sample_output)
         self.assertEqual(self.result, expected_result)
 
     def test_ramspeed_mem_unsuccessful_run_sla(self, mock_ssh):

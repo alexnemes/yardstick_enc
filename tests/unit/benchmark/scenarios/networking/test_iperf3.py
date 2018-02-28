@@ -19,7 +19,6 @@ import unittest
 import mock
 from oslo_serialization import jsonutils
 
-from yardstick.common import utils
 from yardstick.benchmark.scenarios.networking import iperf3
 
 
@@ -82,7 +81,7 @@ class IperfTestCase(unittest.TestCase):
 
         sample_output = self._read_sample_output(self.output_name_tcp)
         mock_ssh.SSH.from_node().execute.return_value = (0, sample_output, '')
-        expected_result = utils.flatten_dict_key(jsonutils.loads(sample_output))
+        expected_result = jsonutils.loads(sample_output)
         p.run(result)
         self.assertEqual(result, expected_result)
 
@@ -101,7 +100,7 @@ class IperfTestCase(unittest.TestCase):
 
         sample_output = self._read_sample_output(self.output_name_tcp)
         mock_ssh.SSH.from_node().execute.return_value = (0, sample_output, '')
-        expected_result = utils.flatten_dict_key(jsonutils.loads(sample_output))
+        expected_result = jsonutils.loads(sample_output)
         p.run(result)
         self.assertEqual(result, expected_result)
 
@@ -136,7 +135,7 @@ class IperfTestCase(unittest.TestCase):
 
         sample_output = self._read_sample_output(self.output_name_udp)
         mock_ssh.SSH.from_node().execute.return_value = (0, sample_output, '')
-        expected_result = utils.flatten_dict_key(jsonutils.loads(sample_output))
+        expected_result = jsonutils.loads(sample_output)
         p.run(result)
         self.assertEqual(result, expected_result)
 

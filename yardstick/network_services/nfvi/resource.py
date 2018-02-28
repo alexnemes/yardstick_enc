@@ -14,28 +14,19 @@
 """ Resource collection definitions """
 
 from __future__ import absolute_import
-from __future__ import print_function
-import tempfile
 import logging
-import os
 import os.path
 import re
 import multiprocessing
-
 from oslo_config import cfg
 
 from yardstick import ssh
-from yardstick.common.utils import validate_non_string_sequence
 from yardstick.network_services.nfvi.collectd import AmqpConsumer
-from yardstick.network_services.utils import get_nsb_option
-
-LOG = logging.getLogger(__name__)
+from yardstick.network_services.utils import provision_tool
 
 CONF = cfg.CONF
 ZMQ_OVS_PORT = 5567
 ZMQ_POLLING_TIME = 12000
-LIST_PLUGINS_ENABLED = ["amqp", "cpu", "cpufreq", "intel_rdt", "memory",
-                        "hugepages", "dpdkstat", "virt", "ovs_stats", "intel_pmu"]
 
 
 class ResourceProfile(object):
@@ -43,16 +34,17 @@ class ResourceProfile(object):
     This profile adds a resource at the beginning of the test session
     """
 
-    def __init__(self, mgmt, interfaces=None, cores=None):
+    def __init__(self, vnfd, cores):
         self.enable = True
-        self.cores = validate_non_string_sequence(cores, default=[])
-        self._queue = multiprocessing.Queue()
-        self.amqp_client = None
-        self.interfaces = validate_non_string_sequence(interfaces, default=[])
+        self.connection = None
+        self.cores = cores
 
+        mgmt_interface = vnfd.get("mgmt-interface")
         # why the host or ip?
-        self.vnfip = mgmt.get("host", mgmt["ip"])
-        self.connection = ssh.SSH.from_node(mgmt, overrides={"ip": self.vnfip})
+        self.vnfip = mgmt_interface.get("host", mgmt_interface["ip"])
+        self.connection = ssh.SSH.from_node(mgmt_interface,
+                                            overrides={"ip": self.vnfip})
+
         self.connection.wait()
 
     def check_if_sa_running(self, process):
@@ -60,183 +52,90 @@ class ResourceProfile(object):
         err, pid, _ = self.connection.execute("pgrep -f %s" % process)
         return [err == 0, pid]
 
-    def run_collectd_amqp(self):
+    def run_collectd_amqp(self, queue):
         """ run amqp consumer to collect the NFVi data """
-        amqp_url = 'amqp://admin:admin@{}:5672/%2F'.format(self.vnfip)
-        amqp = AmqpConsumer(amqp_url, self._queue)
+        amqp = \
+            AmqpConsumer('amqp://admin:admin@{}:5672/%2F'.format(self.vnfip),
+                         queue)
         try:
             amqp.run()
         except (AttributeError, RuntimeError, KeyboardInterrupt):
             amqp.stop()
 
     @classmethod
-    def parse_simple_resource(cls, key, value):
-        reskey = "/".join(rkey for rkey in key if "nsb_stats" not in rkey)
-        return {reskey: value.split(":")[1]}
-
-    @classmethod
-    def get_cpu_data(cls, res_key0, res_key1, value):
+    def get_cpu_data(cls, reskey, value):
         """ Get cpu topology of the host """
         pattern = r"-(\d+)"
-
-        if 'cpufreq' in res_key0:
-            metric, source = res_key0, res_key1
+        if "cpufreq" in reskey[1]:
+            match = re.search(pattern, reskey[2], re.MULTILINE)
+            metric = reskey[1]
         else:
-            metric, source = res_key1, res_key0
+            match = re.search(pattern, reskey[1], re.MULTILINE)
+            metric = reskey[2]
 
-        match = re.search(pattern, source, re.MULTILINE)
-        if not match:
-            return "error", "Invalid", "", ""
+        time, val = re.split(":", value)
+        if match:
+            return [str(match.group(1)), metric, val, time]
 
-        time, value = value.split(":")
-        return str(match.group(1)), metric, value, time
+        return ["error", "Invalid", ""]
 
-    @classmethod
-    def parse_hugepages(cls, key, value):
-        return cls.parse_simple_resource(key, value)
-
-    @classmethod
-    def parse_dpdkstat(cls, key, value):
-        return cls.parse_simple_resource(key, value)
-
-    @classmethod
-    def parse_virt(cls, key, value):
-        return cls.parse_simple_resource(key, value)
-
-    @classmethod
-    def parse_ovs_stats(cls, key, value):
-        return cls.parse_simple_resource(key, value)
-
-    @classmethod
-    def parse_intel_pmu_stats(cls, key, value):
-        return {''.join(str(v) for v in key): value.split(":")[1]}
-
-    def parse_collectd_result(self, metrics, core_list):
+    def parse_collectd_result(self, metrics, listcores):
         """ convert collectd data into json"""
-        result = {
-            "cpu": {},
-            "memory": {},
-            "hugepages": {},
-            "dpdkstat": {},
-            "virt": {},
-            "ovs_stats": {},
-            "intel_pmu": {},
-        }
+        res = {"cpu": {}, "memory": {}}
         testcase = ""
 
         for key, value in metrics.items():
-            key_split = key.split("/")
-            res_key_iter = (key for key in key_split if "nsb_stats" not in key)
-            res_key0 = next(res_key_iter)
-            res_key1 = next(res_key_iter)
-
-            if "cpu" in res_key0 or "intel_rdt" in res_key0:
+            reskey = key.rsplit("/")
+            if "cpu" in reskey[1] or "intel_rdt" in reskey[1]:
                 cpu_key, name, metric, testcase = \
-                    self.get_cpu_data(res_key0, res_key1, value)
-                if cpu_key in core_list:
-                    result["cpu"].setdefault(cpu_key, {}).update({name: metric})
+                    self.get_cpu_data(reskey, value)
+                if cpu_key in listcores:
+                    res["cpu"].setdefault(cpu_key, {}).update({name: metric})
+            elif "memory" in reskey[1]:
+                val = re.split(":", value)[1]
+                res["memory"].update({reskey[2]: val})
+        res["timestamp"] = testcase
 
-            elif "memory" in res_key0:
-                result["memory"].update({res_key1: value.split(":")[0]})
+        return res
 
-            elif "hugepages" in res_key0:
-                result["hugepages"].update(self.parse_hugepages(key_split, value))
-
-            elif "dpdkstat" in res_key0:
-                result["dpdkstat"].update(self.parse_dpdkstat(key_split, value))
-
-            elif "virt" in res_key1:
-                result["virt"].update(self.parse_virt(key_split, value))
-
-            elif "ovs_stats" in res_key0:
-                result["ovs_stats"].update(self.parse_ovs_stats(key_split, value))
-
-            elif "intel_pmu-all" in res_key0:
-                result["intel_pmu"].update(self.parse_intel_pmu_stats(res_key1, value))
-
-        result["timestamp"] = testcase
-
-        return result
-
-    def amqp_process_for_nfvi_kpi(self):
+    def amqp_collect_nfvi_kpi(self, _queue=multiprocessing.Queue()):
         """ amqp collect and return nfvi kpis """
-        if self.amqp_client is None and self.enable:
-            self.amqp_client = \
-                multiprocessing.Process(target=self.run_collectd_amqp)
-            self.amqp_client.start()
+        try:
+            metric = {}
+            amqp_client = \
+                multiprocessing.Process(target=self.run_collectd_amqp,
+                                        args=(_queue,))
+            amqp_client.start()
+            amqp_client.join(7)
+            amqp_client.terminate()
 
-    def amqp_collect_nfvi_kpi(self):
-        """ amqp collect and return nfvi kpis """
-        if not self.enable:
-            return {}
+            while not _queue.empty():
+                metric.update(_queue.get())
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            logging.debug("Failed to get NFVi stats...")
+            msg = {}
+        else:
+            msg = self.parse_collectd_result(metric, self.cores)
 
-        metric = {}
-        while not self._queue.empty():
-            metric.update(self._queue.get())
-        msg = self.parse_collectd_result(metric, self.cores)
         return msg
 
-    def _provide_config_file(self, bin_path, nfvi_cfg, kwargs):
-        with open(os.path.join(bin_path, nfvi_cfg), 'r') as cfg:
-            template = cfg.read()
-        cfg, cfg_content = tempfile.mkstemp()
-        with os.fdopen(cfg, "w+") as cfg:
-            cfg.write(template.format(**kwargs))
-        cfg_file = os.path.join(bin_path, nfvi_cfg)
-        self.connection.put(cfg_content, cfg_file)
-
-    def _prepare_collectd_conf(self, bin_path):
-        """ Prepare collectd conf """
-        loadplugin = "\n".join("LoadPlugin {0}".format(plugin)
-                               for plugin in LIST_PLUGINS_ENABLED)
-
-        interfaces = "\n".join("PortName '{0[name]}'".format(interface)
-                               for interface in self.interfaces)
-
-        kwargs = {
-            "interval": '25',
-            "loadplugin": loadplugin,
-            "dpdk_interface": interfaces,
-        }
-        self._provide_config_file(bin_path, 'collectd.conf', kwargs)
-
-    def _start_collectd(self, connection, bin_path):
-        LOG.debug("Starting collectd to collect NFVi stats")
-        connection.execute('sudo pkill -9 collectd')
-        bin_path = get_nsb_option("bin_path")
-        collectd_path = os.path.join(bin_path, "collectd", "collectd")
-        exit_status = connection.execute("which %s > /dev/null 2>&1" % collectd_path)[0]
-        if exit_status != 0:
-            LOG.warning("%s is not present disabling", collectd_path)
-            # disable auto-provisioning because it requires Internet access
-            # collectd_installer = os.path.join(bin_path, "collectd.sh")
-            # provision_tool(connection, collectd)
-            # http_proxy = os.environ.get('http_proxy', '')
-            # https_proxy = os.environ.get('https_proxy', '')
-            # connection.execute("sudo %s '%s' '%s'" % (
-            #     collectd_installer, http_proxy, https_proxy))
-            return
-        LOG.debug("Starting collectd to collect NFVi stats")
-        self._prepare_collectd_conf(bin_path)
+    @classmethod
+    def _start_collectd(cls, connection, bin_path):
+        connection.execute('pkill -9 collectd')
+        collectd = os.path.join(bin_path, "collectd.sh")
+        provision_tool(connection, collectd)
+        provision_tool(connection, os.path.join(bin_path, "collectd.conf"))
 
         # Reset amqp queue
-        LOG.debug("reset and setup amqp to collect data from collectd")
-        connection.execute("sudo rm -rf /var/lib/rabbitmq/mnesia/rabbit*")
         connection.execute("sudo service rabbitmq-server start")
         connection.execute("sudo rabbitmqctl stop_app")
         connection.execute("sudo rabbitmqctl reset")
         connection.execute("sudo rabbitmqctl start_app")
         connection.execute("sudo service rabbitmq-server restart")
 
-        LOG.debug("Creating amdin user for rabbitmq in order to collect data from collectd")
-        connection.execute("sudo rabbitmqctl delete_user guest")
-        connection.execute("sudo rabbitmqctl add_user admin admin")
-        connection.execute("sudo rabbitmqctl authenticate_user admin admin")
-        connection.execute("sudo rabbitmqctl set_permissions -p / admin '.*' '.*' '.*'")
-
-        LOG.debug("Start collectd service.....")
-        connection.execute("sudo %s" % collectd_path)
-        LOG.debug("Done")
+        # Run collectd
+        connection.execute(collectd)
+        connection.execute(os.path.join(bin_path, "collectd", "collectd"))
 
     def initiate_systemagent(self, bin_path):
         """ Start system agent for NFVi collection on host """
@@ -246,24 +145,16 @@ class ResourceProfile(object):
     def start(self):
         """ start nfvi collection """
         if self.enable:
-            LOG.debug("Start NVFi metric collection...")
+            logging.debug("Start NVFi metric collection...")
 
     def stop(self):
         """ stop nfvi collection """
-        if not self.enable:
-            return
-
-        agent = "collectd"
-        LOG.debug("Stop resource monitor...")
-
-        if self.amqp_client is not None:
-            self.amqp_client.terminate()
-
-        status, pid = self.check_if_sa_running(agent)
-        if status == 0:
-            return
-
-        self.connection.execute('sudo kill -9 %s' % pid)
-        self.connection.execute('sudo pkill -9 %s' % agent)
-        self.connection.execute('sudo service rabbitmq-server stop')
-        self.connection.execute("sudo rabbitmqctl stop_app")
+        if self.enable:
+            agent = "collectd"
+            logging.debug("Stop resource monitor...")
+            status, pid = self.check_if_sa_running(agent)
+            if status:
+                self.connection.execute('kill -9 %s' % pid)
+                self.connection.execute('pkill -9 %s' % agent)
+                self.connection.execute('service rabbitmq-server stop')
+                self.connection.execute("sudo rabbitmqctl stop_app")

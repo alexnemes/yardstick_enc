@@ -12,7 +12,7 @@ schema: "yardstick:task:0.1"
 description: >
     Test case for TC045 :Control node Openstack service down - neutron server.
 
-{% set file = file or '/etc/yardstick/pod.yaml' %}
+{% set file = file or 'etc/yardstick/nodes/fuel_baremetal/pod.yaml' %}
 
 scenarios:
 -
@@ -33,10 +33,10 @@ scenarios:
     - monitor_type: "process"
       process_name: "neutron-server"
       host: node1
-      monitor_time: 30
+      monitor_time: 20
       monitor_number: 3
       sla:
-        max_recover_time: 30
+        max_recover_time: 20
 
   nodes:
     node1: node1.LF

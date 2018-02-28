@@ -13,8 +13,7 @@ import multiprocessing
 import time
 import os
 import yardstick.common.utils as utils
-
-from yardstick.common.yaml_loader import yaml_load
+import yaml
 
 LOG = logging.getLogger(__name__)
 
@@ -44,11 +43,7 @@ class MonitorMgr(object):
             monitor_ins = monitor_cls(monitor_cfg, context,
                                       self.monitor_mgr_data)
             if "key" in monitor_cfg:
-                monitor_ins.tag = monitor_ins.key = monitor_cfg["key"]
-            elif monitor_type == "openstack-cmd":
-                monitor_ins.tag = monitor_cfg["command_name"].replace(" ", "-")
-            elif monitor_type == "process":
-                monitor_ins.tag = monitor_type + "_" + monitor_cfg["process_name"]
+                monitor_ins.key = monitor_cfg["key"]
             self._monitor_list.append(monitor_ins)
 
     def __getitem__(self, item):
@@ -71,12 +66,6 @@ class MonitorMgr(object):
             sla_pass = sla_pass & monitor.verify_SLA()
         return sla_pass
 
-    def store_result(self, result):
-        for monitor in self._monitor_list:
-            monitor_result = monitor.get_result()
-            for k, v in monitor_result.items():
-                result[monitor.tag + "_" + k] = v
-
 
 class BaseMonitor(multiprocessing.Process):
     """docstring for BaseMonitor"""
@@ -85,7 +74,7 @@ class BaseMonitor(multiprocessing.Process):
     def __init__(self, config, context, data):
         if not BaseMonitor.monitor_cfgs:
             with open(monitor_conf_path) as stream:
-                BaseMonitor.monitor_cfgs = yaml_load(stream)
+                BaseMonitor.monitor_cfgs = yaml.load(stream)
         multiprocessing.Process.__init__(self)
         self._config = config
         self._context = context
@@ -93,7 +82,6 @@ class BaseMonitor(multiprocessing.Process):
         self._event = multiprocessing.Event()
         self.monitor_data = data
         self.setup_done = False
-        self.tag = ""
 
     @staticmethod
     def get_monitor_cls(monitor_type):
@@ -175,5 +163,5 @@ class BaseMonitor(multiprocessing.Process):
     def verify_SLA(self):
         pass
 
-    def get_result(self):
+    def result(self):
         return self._result

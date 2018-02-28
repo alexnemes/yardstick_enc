@@ -11,13 +11,7 @@
 
 """
 from __future__ import absolute_import
-
-import six
-import logging
 from six.moves import range
-
-
-LOG = logging.getLogger(__name__)
 
 
 class Object(object):
@@ -110,25 +104,9 @@ class Network(Object):
         self.stack_name = context.name + "-" + self.name
         self.subnet_stack_name = self.stack_name + "-subnet"
         self.subnet_cidr = attrs.get('cidr', '10.0.1.0/24')
-        self.enable_dhcp = attrs.get('enable_dhcp', 'true')
         self.router = None
         self.physical_network = attrs.get('physical_network', 'physnet1')
-        self.provider = attrs.get('provider')
-        self.segmentation_id = attrs.get('segmentation_id')
-        self.network_type = attrs.get('network_type')
-        self.port_security_enabled = attrs.get('port_security_enabled')
-        self.vnic_type = attrs.get('vnic_type', 'normal')
-        self.allowed_address_pairs = attrs.get('allowed_address_pairs', [])
-        try:
-            # we require 'null' or '' to disable setting gateway_ip
-            self.gateway_ip = attrs['gateway_ip']
-        except KeyError:
-            # default to explicit None
-            self.gateway_ip = None
-        else:
-            # null is None in YAML, so we have to convert back to string
-            if self.gateway_ip is None:
-                self.gateway_ip = "null"
+        self.provider = attrs.get('provider', None)
 
         if "external_network" in attrs:
             self.router = Router("router", self.name,
@@ -152,8 +130,7 @@ class Network(Object):
     @staticmethod
     def find_external_network():
         """return the name of an external network some network in this
-        context has a route to
-        """
+        context has a route to"""
         for network in Network.list:
             if network.router:
                 return network.router.external_gateway_info
@@ -173,15 +150,13 @@ class Server(Object):     # pragma: no cover
         self.context = context
         self.public_ip = None
         self.private_ip = None
-        self.user_data = ''
-        self.interfaces = {}
 
         if attrs is None:
             attrs = {}
 
         self.placement_groups = []
         placement = attrs.get("placement", [])
-        placement = placement if isinstance(placement, list) else [placement]
+        placement = placement if type(placement) is list else [placement]
         for p in placement:
             pg = PlacementGroup.get(p)
             if not pg:
@@ -190,18 +165,10 @@ class Server(Object):     # pragma: no cover
             self.placement_groups.append(pg)
             pg.add_member(self.stack_name)
 
-        self.volume = None
-        if "volume" in attrs:
-            self.volume = attrs.get("volume")
-
-        self.volume_mountpoint = None
-        if "volume_mountpoint" in attrs:
-            self.volume_mountpoint = attrs.get("volume_mountpoint")
-
         # support servergroup attr
         self.server_group = None
         sg = attrs.get("server_group")
-        if sg:
+        if (sg):
             server_group = ServerGroup.get(sg)
             if not server_group:
                 raise ValueError("server '%s', server_group '%s' is invalid" %
@@ -214,7 +181,6 @@ class Server(Object):     # pragma: no cover
             self.instances = attrs["instances"]
 
         # dict with key network name, each item is a dict with port name and ip
-        self.network_ports = attrs.get("network_ports", {})
         self.ports = {}
 
         self.floating_ip = None
@@ -235,8 +201,6 @@ class Server(Object):     # pragma: no cover
         self._flavor = None
         if "flavor" in attrs:
             self._flavor = attrs["flavor"]
-
-        self.user_data = attrs.get('user_data', '')
 
         Server.list.append(self)
 
@@ -260,80 +224,34 @@ class Server(Object):     # pragma: no cover
         """adds to the template one server and corresponding resources"""
         port_name_list = []
         for network in networks:
-            # if explicit mapping skip unused networks
-            if self.network_ports:
-                try:
-                    ports = self.network_ports[network.name]
-                except KeyError:
-                    # no port for this network
-                    continue
-                else:
-                    if isinstance(ports, six.string_types):
-                        if ports.startswith('-'):
-                            LOG.warning("possible YAML error, port name starts with - '%s", ports)
-                        ports = [ports]
-            # otherwise add a port for every network with port name as network name
-            else:
-                ports = [network.name]
-            for port in ports:
-                port_name = "{0}-{1}-port".format(server_name, port)
-                self.ports.setdefault(network.name, []).append(
-                    {"stack_name": port_name, "port": port})
-                # we can't use secgroups if port_security_enabled is False
-                if network.port_security_enabled is False:
-                    sec_group_id = None
-                else:
-                    # if port_security_enabled is None we still need to add to secgroup
-                    sec_group_id = self.secgroup_name
-                # don't refactor to pass in network object, that causes JSON
-                # circular ref encode errors
-                template.add_port(port_name, network.stack_name, network.subnet_stack_name,
-                                  network.vnic_type, sec_group_id=sec_group_id,
-                                  provider=network.provider,
-                                  allowed_address_pairs=network.allowed_address_pairs)
-                port_name_list.append(port_name)
+            port_name = server_name + "-" + network.name + "-port"
+            self.ports[network.name] = {"stack_name": port_name}
+            template.add_port(port_name, network.stack_name,
+                              network.subnet_stack_name,
+                              sec_group_id=self.secgroup_name,
+                              provider=network.provider)
+            port_name_list.append(port_name)
 
-                if self.floating_ip:
-                    external_network = self.floating_ip["external_network"]
-                    if network.has_route_to(external_network):
-                        self.floating_ip["stack_name"] = server_name + "-fip"
-                        template.add_floating_ip(self.floating_ip["stack_name"],
-                                                 external_network,
-                                                 port_name,
-                                                 network.router.stack_if_name,
-                                                 sec_group_id)
-                        self.floating_ip_assoc["stack_name"] = \
-                            server_name + "-fip-assoc"
-                        template.add_floating_ip_association(
-                            self.floating_ip_assoc["stack_name"],
-                            self.floating_ip["stack_name"],
-                            port_name)
-        if self.flavor:
-            if isinstance(self.flavor, dict):
-                self.flavor["name"] = \
-                    self.flavor.setdefault("name", self.stack_name + "-flavor")
-                template.add_flavor(**self.flavor)
-                self.flavor_name = self.flavor["name"]
-            else:
-                self.flavor_name = self.flavor
+            if self.floating_ip:
+                external_network = self.floating_ip["external_network"]
+                if network.has_route_to(external_network):
+                    self.floating_ip["stack_name"] = server_name + "-fip"
+                    template.add_floating_ip(self.floating_ip["stack_name"],
+                                             external_network,
+                                             port_name,
+                                             network.router.stack_if_name,
+                                             self.secgroup_name)
+                    self.floating_ip_assoc["stack_name"] = \
+                        server_name + "-fip-assoc"
+                    template.add_floating_ip_association(
+                        self.floating_ip_assoc["stack_name"],
+                        self.floating_ip["stack_name"],
+                        port_name)
 
-        if self.volume:
-            if isinstance(self.volume, dict):
-                self.volume["name"] = \
-                    self.volume.setdefault("name", server_name + "-volume")
-                template.add_volume(**self.volume)
-                template.add_volume_attachment(server_name, self.volume["name"],
-                                               mountpoint=self.volume_mountpoint)
-            else:
-                template.add_volume_attachment(server_name, self.volume,
-                                               mountpoint=self.volume_mountpoint)
-
-        template.add_server(server_name, self.image, flavor=self.flavor_name,
-                            flavors=self.context.flavors,
+        template.add_server(server_name, self.image, self.flavor,
                             ports=port_name_list,
                             user=self.user,
                             key_name=self.keypair_name,
-                            user_data=self.user_data,
                             scheduler_hints=scheduler_hints)
 
     def add_to_template(self, template, networks, scheduler_hints=None):
@@ -351,7 +269,7 @@ class Server(Object):     # pragma: no cover
 
 
 def update_scheduler_hints(scheduler_hints, added_servers, placement_group):
-    """update scheduler hints from server's placement configuration
+    """ update scheduler hints from server's placement configuration
     TODO: this code is openstack specific and should move somewhere else
     """
     if placement_group.policy == "affinity":

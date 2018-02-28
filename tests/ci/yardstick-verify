@@ -87,9 +87,7 @@ error_exit()
         exitcode=$rc
     fi
 
-    if [[ "${DEPLOY_SCENARIO:0:2}" == 'os' ]];then
-        source "${YARDSTICK_REPO_DIR}/tests/ci/clean_images.sh"
-    fi
+    cleanup
 
     echo "Exiting with RC=$exitcode"
 
@@ -101,8 +99,8 @@ set -o pipefail
 
 install_storperf()
 {
-    # Install Storper on huawei-pod1 and huawei-pod2
-    if [ "$NODE_NAME" == "huawei-pod1" -o "$NODE_NAME" == "huawei-pod2" ]; then
+    # Install Storper on huawei-pod1
+    if [ "$NODE_NAME" == "huawei-pod1" ]; then
         echo
         echo "========== Installing storperf =========="
 
@@ -116,8 +114,8 @@ install_storperf()
 
 remove_storperf()
 {
-    # remove Storper from huawei-pod1 and huawei-pod2
-    if [ "$NODE_NAME" == "huawei-pod1" -o "$NODE_NAME" == "huawei-pod2" ]; then
+    # remove Storper from huawei-pod1
+    if [ "$NODE_NAME" == "huawei-pod1" ]; then
         echo
         echo "========== Removing storperf =========="
 
@@ -250,38 +248,6 @@ EOF
 
 }
 
-check_openstack(){
-    # check if some necessary variables is set
-    if [ -z "$OS_AUTH_URL" ]; then
-        echo "OS_AUTH_URL is unset or empty"
-        exit 1
-    fi
-
-    echo "OS_AUTH_URL is $OS_AUTH_URL"
-    echo
-
-    # check OpenStack services
-    if [[ $OS_INSECURE ]] && [[ "$(echo $OS_INSECURE | tr '[:upper:]' '[:lower:]')" = "true" ]]; then
-        SECURE="--insecure"
-    else
-        SECURE=""
-    fi
-    echo "Checking OpenStack services:"
-    for cmd in "openstack ${SECURE} image list" "openstack ${SECURE} server list" "openstack ${SECURE} stack list"; do
-        echo "  checking ${cmd} ..."
-        if ! $cmd >/dev/null; then
-            echo "error: command \"$cmd\" failed"
-            exit 1
-        fi
-    done
-
-    echo
-    echo "Checking for External network:"
-    for net in $(openstack network list --external -c Name -f value); do
-        echo "  external network: $net"
-    done
-}
-
 main()
 {
     GITROOT=$(cd $(dirname $0) && git rev-parse --show-toplevel)
@@ -317,15 +283,36 @@ main()
     done
     echo
 
-    trap "error_exit" EXIT SIGTERM
-
-    if [[ "${DEPLOY_SCENARIO:0:2}" == "os" ]];then
-        check_openstack
-
-        source $YARDSTICK_REPO_DIR/tests/ci/clean_images.sh
-        source $YARDSTICK_REPO_DIR/tests/ci/load_images.sh
+    # check if some necessary variables is set
+    if [ -z "$OS_AUTH_URL" ]; then
+        echo "OS_AUTH_URL is unset or empty"
+        exit 1
     fi
 
+    echo "OS_AUTH_URL is $OS_AUTH_URL"
+    echo
+
+    # check OpenStack services
+    echo "Checking OpenStack services:"
+    for cmd in "openstack image list" "openstack server list" "openstack stack list"; do
+        echo "  checking ${cmd} ..."
+        if ! $cmd >/dev/null; then
+            echo "error: command \"$cmd\" failed"
+            exit 1
+        fi
+    done
+
+    echo
+    echo "Checking for External network:"
+    for net in $(openstack network list --external -c Name -f value); do
+        echo "  external network: $net"
+    done
+
+    source $YARDSTICK_REPO_DIR/tests/ci/clean_images.sh
+
+    trap "error_exit" EXIT SIGTERM
+
+    source $YARDSTICK_REPO_DIR/tests/ci/load_images.sh
     install_storperf
     run_test
     remove_storperf

@@ -26,21 +26,21 @@ class EnvCommand(object):
     """
 
     def do_influxdb(self, args):
-        data = {'action': 'create_influxdb'}
+        data = {'action': 'createInfluxDBContainer'}
         task_id = self._start_async_task(data)
 
         start = '* creating influxDB'
         self._check_status(task_id, start)
 
     def do_grafana(self, args):
-        data = {'action': 'create_grafana'}
+        data = {'action': 'createGrafanaContainer'}
         task_id = self._start_async_task(data)
 
         start = '* creating grafana'
         self._check_status(task_id, start)
 
     def do_prepare(self, args):
-        data = {'action': 'prepare_env'}
+        data = {'action': 'prepareYardstickEnv'}
         task_id = self._start_async_task(data)
 
         start = '* preparing yardstick environment'

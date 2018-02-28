@@ -30,10 +30,7 @@ OPTS = [
                help='bin_path for VNFs location.'),
     cfg.StrOpt('trex_path',
                default=os.path.join(NSB_ROOT, 'trex/scripts'),
-               help='trex automation lib path.'),
-    cfg.StrOpt('trex_client_lib',
-               default=os.path.join(NSB_ROOT, 'trex_client/stl'),
-               help='trex python library path.'),
+               help='trex automation lib pathh.'),
 ]
 CONF.register_opts(OPTS, group="nsb")
 
@@ -48,19 +45,17 @@ def get_nsb_option(option, default=None):
     return default
 
 
-def provision_tool(connection, tool_path, tool_file=None):
+def provision_tool(connection, tool_path):
     """
     verify if the tool path exits on the node,
     if not push the local binary to remote node
 
     :return - Tool path
     """
-    if tool_file:
-        tool_path = os.path.join(tool_path, tool_file)
     bin_path = get_nsb_option("bin_path")
-    exit_status = connection.execute("which %s > /dev/null 2>&1" % tool_path)[0]
+    exit_status, stdout = connection.execute("which %s" % tool_path)[:2]
     if exit_status == 0:
-        return encodeutils.safe_decode(tool_path, incoming='utf-8').rstrip()
+        return encodeutils.safe_decode(stdout, incoming='utf-8').rstrip()
 
     logging.warning("%s not found on %s, will try to copy from localhost",
                     tool_path, connection.host)

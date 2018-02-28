@@ -158,7 +158,7 @@ class Cyclictest(base.Scenario):
 
     def run(self, result):
         """execute the benchmark"""
-        default_args = "-m -n -q --notrace"
+        default_args = "-m -n -q"
 
         if not self.setup_done:
             self.setup()

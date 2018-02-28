@@ -13,13 +13,13 @@ from __future__ import print_function
 from __future__ import absolute_import
 import os
 import sys
+import yaml
 import time
 import logging
 import pkg_resources
 import yardstick.ssh as ssh
 
 from yardstick.common.task_template import TaskTemplate
-from yardstick.common.yaml_loader import yaml_load
 
 LOG = logging.getLogger(__name__)
 
@@ -38,19 +38,19 @@ class Plugin(object):
 
         plugins, deployment = parser.parse_plugin()
         plugin_name = plugins.get("name")
-        LOG.info("Installing plugin: %s", plugin_name)
+        print("Installing plugin: %s" % plugin_name)
 
-        LOG.debug("Executing _install_setup()")
+        LOG.info("Executing _install_setup()")
         self._install_setup(plugin_name, deployment)
 
-        LOG.debug("Executing _run()")
+        LOG.info("Executing _run()")
         self._run(plugin_name)
 
         total_end_time = time.time()
-        LOG.info("Total finished in %d secs",
+        LOG.info("total finished in %d secs",
                  total_end_time - total_start_time)
 
-        LOG.info("Plugin %s Done, exiting", plugin_name)
+        print("Done, exiting")
 
     def remove(self, args):
         """Remove a plugin."""
@@ -84,8 +84,8 @@ class Plugin(object):
 
         if deployment_ip == "local":
             self.client = ssh.SSH.from_node(deployment, overrides={
-                # host can't be None, fail if no JUMP_HOST_IP
-                'ip': os.environ["JUMP_HOST_IP"],
+                # host can't be None, fail if no INSTALLER_IP
+                'ip': os.environ["INSTALLER_IP"],
             })
         else:
             self.client = ssh.SSH.from_node(deployment)
@@ -107,8 +107,8 @@ class Plugin(object):
 
         if deployment_ip == "local":
             self.client = ssh.SSH.from_node(deployment, overrides={
-                # host can't be None, fail if no JUMP_HOST_IP
-                'ip': os.environ["JUMP_HOST_IP"],
+                # host can't be None, fail if no INSTALLER_IP
+                'ip': os.environ["INSTALLER_IP"],
             })
         else:
             self.client = ssh.SSH.from_node(deployment)
@@ -153,7 +153,7 @@ class PluginParser(object):
                     raise e
                 print("Input plugin is:\n%s\n" % rendered_plugin)
 
-                cfg = yaml_load(rendered_plugin)
+                cfg = yaml.load(rendered_plugin)
         except IOError as ioerror:
             sys.exit(ioerror)
 

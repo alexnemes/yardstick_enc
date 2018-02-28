@@ -1,119 +1,144 @@
 .. This work is licensed under a Creative Commons Attribution 4.0 International
 .. License.
 .. http://creativecommons.org/licenses/by/4.0
-.. (c) OPNFV, Huawei Technologies Co.,Ltd and others.
+.. (c) OPNFV, Intel Corporation and others.
 
 *************************************
 Yardstick Test Case Description TC006
 *************************************
 
-.. _fio: http://bluestop.org/files/fio/HOWTO.txt
+.. _DPDKpktgen: https://github.com/Pktgen/Pktgen-DPDK/
+.. _rfc2544: https://www.ietf.org/rfc/rfc2544.txt
 
 +-----------------------------------------------------------------------------+
-|Volume storage Performance                                                   |
+|Network Performance                                                          |
 |                                                                             |
 +--------------+--------------------------------------------------------------+
-|test case id  | OPNFV_YARDSTICK_TC006_VOLUME STORAGE PERFORMANCE             |
+|test case id  | OPNFV_YARDSTICK_TC006_Virtual Traffic Classifier Data Plane  |
+|              | Throughput Benchmarking Test.                                |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|metric        | IOPS (Average IOs performed per second),                     |
-|              | Throughput (Average disk read/write bandwidth rate),         |
-|              | Latency (Average disk read/write latency)                    |
+|metric        | Throughput                                                   |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|test purpose  | The purpose of TC006 is to evaluate the IaaS volume storage  |
-|              | performance with regards to IOPS, throughput and latency.    |
-|              |                                                              |
-|              | The purpose is also to be able to spot the trends.           |
-|              | Test results, graphs and similar shall be stored for         |
-|              | comparison reasons and product evolution understanding       |
-|              | between different OPNFV versions and/or configurations.      |
+|test purpose  | To measure the throughput supported by the virtual Traffic   |
+|              | Classifier according to the RFC2544 methodology for a        |
+|              | user-defined set of vTC deployment configurations.           |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|test tool     | fio                                                          |
+|configuration | file: file: opnfv_yardstick_tc006.yaml                       |
 |              |                                                              |
-|              | fio is an I/O tool meant to be used both for benchmark and   |
-|              | stress/hardware verification. It has support for 19          |
-|              | different types of I/O engines (sync, mmap, libaio,          |
-|              | posixaio, SG v3, splice, null, network, syslet, guasi,       |
-|              | solarisaio, and more), I/O priorities (for newer Linux       |
-|              | kernels), rate I/O, forked or threaded jobs, and much more.  |
+|              | packet_size: size of the packets to be used during the       |
+|              |      throughput calculation.                                 |
+|              |      Allowe values: [64, 128, 256, 512, 1024, 1280, 1518]    |
 |              |                                                              |
-|              | (fio is not always part of a Linux distribution, hence it    |
-|              | needs to be installed. As an example see the                 |
-|              | /yardstick/tools/ directory for how to generate a Linux      |
-|              | image with fio included.)                                    |
+|              | vnic_type: type of VNIC to be used.                          |
+|              |      Allowed values are:                                     |
+|              |           - normal: for default OvS port configuration       |
+|              |           - direct: for SR-IOV port configuration            |
+|              |      Default value: None                                     |
 |              |                                                              |
-+--------------+--------------------------------------------------------------+
-|test          | fio test is invoked in a host VM with a volume attached on a |
-|description   | compute blade, a job file as well as parameters are passed   |
-|              | to fio and fio will start doing what the job file tells it   |
-|              | to do.                                                       |
+|              | vtc_flavor: OpenStack flavor to be used for the vTC          |
+|              |      Default available values are: m1.small, m1.medium,      |
+|              |      and m1.large, but the user can create his/her own       |
+|              |      flavor and give it as input                             |
+|              |      Default value: None                                     |
 |              |                                                              |
-+--------------+--------------------------------------------------------------+
-|configuration | file: opnfv_yardstick_tc006.yaml                             |
+|              | vlan_sender: vlan tag of the network on which the vTC will   |
+|              |      receive traffic (VLAN Network 1).                       |
+|              |      Allowed values: range (1, 4096)                         |
 |              |                                                              |
-|              | Fio job file is provided to define the benchmark process     |
-|              | Target volume is mounted at /FIO_Test directory              |
+|              | vlan_receiver: vlan tag of the network on which the vTC      |
+|              |      will send traffic back to the packet generator          |
+|              |      (VLAN Network 2).                                       |
+|              |      Allowed values: range (1, 4096)                         |
 |              |                                                              |
-|              | For SLA, minimum read/write iops is set to 100,              |
-|              | minimum read/write throughput is set to 400 KB/s,            |
-|              | and maximum read/write latency is set to 20000 usec.         |
+|              | default_net_name: neutron name of the defaul network that    |
+|              |      is used for access to the internet from the vTC         |
+|              |      (vNIC 1).                                               |
 |              |                                                              |
-+--------------+--------------------------------------------------------------+
-|applicability | This test case can be configured with different:             |
+|              | default_subnet_name: subnet name for vNIC1                   |
+|              |      (information available through Neutron).                |
 |              |                                                              |
-|              |   * Job file;                                                |
-|              |   * Volume mount directory.                                  |
+|              | vlan_net_1_name: Neutron Name for VLAN Network 1             |
+|              |      (information available through Neutron).                |
 |              |                                                              |
-|              | SLA is optional. The SLA in this test case serves as an      |
-|              | example. Considerably higher throughput and lower latency    |
-|              | are expected. However, to cover most configurations, both    |
-|              | baremetal and fully virtualized  ones, this value should be  |
-|              | possible to achieve and acceptable for black box testing.    |
-|              | Many heavy IO applications start to suffer badly if the      |
-|              | read/write bandwidths are lower than this.                   |
+|              | vlan_subnet_1_name: Subnet Neutron name for VLAN Network 1   |
+|              |      (information available through Neutron).                |
 |              |                                                              |
-+--------------+--------------------------------------------------------------+
-|usability     | This test case is one of Yardstick's generic test. Thus it   |
-|              | is runnable on most of the scenarios.                        |
+|              | vlan_net_2_name: Neutron Name for VLAN Network 2             |
+|              |      (information available through Neutron).                |
+|              |                                                              |
+|              | vlan_subnet_2_name: Subnet Neutron name for VLAN Network 2   |
+|              |      (information available through Neutron).                |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|references    | fio_                                                         |
+|test tool     | DPDK pktgen                                                  |
+|              |                                                              |
+|              | DPDK Pktgen is not part of a Linux distribution,             |
+|              | hence it needs to be installed by the user.                  |
+|              |                                                              |
++--------------+--------------------------------------------------------------+
+|references    | DPDK Pktgen: DPDKpktgen_                                     |
 |              |                                                              |
 |              | ETSI-NFV-TST001                                              |
 |              |                                                              |
-+--------------+--------------------------------------------------------------+
-|pre-test      | The test case image needs to be installed into Glance        |
-|conditions    | with fio included in it.                                     |
-|              |                                                              |
-|              | No POD specific requirements have been identified.           |
+|              | RFC 2544: rfc2544_                                           |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|test sequence | description and expected result                              |
+|applicability | Test can be configured with different flavors, vNIC type     |
+|              | and packet sizes. Default values exist as specified above.   |
+|              | The vNIC type and flavor MUST be specified by the user.      |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|step 1        | A host VM with fio installed is booted.                      |
-|              | A 200G volume is attached to the host VM                     |
+|pre-test      | The vTC has been successfully instantiated and configured.   |
+|              | The user has correctly assigned the values to the deployment |
+|              |  configuration parameters.                                   |
+|              |                                                              |
+|              | - Multicast traffic MUST be enabled on the network.          |
+|              |      The Data network switches need to be configured in      |
+|              |      order to manage multicast traffic.                      |
+|              | - In the case of SR-IOV vNICs use, SR-IOV compatible NICs    |
+|              |      must be used on the compute node.                       |
+|              | - Yarsdtick needs to be installed on a host connected to the |
+|              |      data network and the host must have 2 DPDK-compatible   |
+|              |      NICs. Proper configuration of DPDK and DPDK pktgen is   |
+|              |      required before to run the test case.                   |
+|              |      (For further instructions please refer to the ApexLake  |
+|              |      documentation).                                         |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|step 2        | Yardstick is connected with the host VM by using ssh.        |
-|              | 'job_file.ini' is copyied from Jump Host to the host VM via  |
-|              | the ssh tunnel. The attached volume is formated and mounted. |
+|test sequence | Description and expected results                             |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|step 3        | Fio benchmark is invoked. Simulated IO operations are        |
-|              | started. IOPS, disk read/write bandwidth and latency are     |
-|              | recorded and checked against the SLA. Logs are produced and  |
-|              | stored.                                                      |
-|              |                                                              |
-|              | Result: Logs are stored.                                     |
+|step  1       | The vTC is deployed, according to the user-defined           |
+|              | configuration                                                |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|step 4        | The host VM is deleted.                                      |
+|step  2       | The vTC is correctly deployed and configured as necessary    |
+|              | The initialization script has been correctly executed and    |
+|              | vTC is ready to receive and process the traffic.             |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+
-|test verdict  | Fails only if SLA is not passed, or if there is a test case  |
-|              | execution problem.                                           |
+|step  3       | Test case is executed with the selected parameters:          |
+|              | - vTC flavor                                                 |
+|              | - vNIC type                                                  |
+|              | - packet size                                                |
+|              | The traffic is sent to the vTC using the maximum available   |
+|              | traffic rate for 60 seconds.                                 |
+|              |                                                              |
++--------------+--------------------------------------------------------------+
+|step 4        | The vTC instance forwards all the packets back to the packet |
+|              | generator for 60 seconds, as specified by RFC 2544.          |
+|              |                                                              |
+|              | Steps 3 and 4 are executed different times, with different   |
+|              | rates in order to find the maximum supported traffic rate    |
+|              | according to the current definition of throughput in RFC     |
+|              | 2544.                                                        |
+|              |                                                              |
++--------------+--------------------------------------------------------------+
+|test verdict  |  The result of the test is a number between 0 and 100 which  |
+|              |  represents the throughput in terms of percentage of the     |
+|              |  available pktgen NIC bandwidth.                             |
 |              |                                                              |
 +--------------+--------------------------------------------------------------+

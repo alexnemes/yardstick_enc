@@ -33,7 +33,7 @@ LOG = logging.getLogger(__name__)
 
 
 def _worker_process(queue, cls, method_name, scenario_cfg,
-                    context_cfg, aborted, output_queue):
+                    context_cfg, aborted):
 
     sequence = 1
 
@@ -57,6 +57,10 @@ def _worker_process(queue, cls, method_name, scenario_cfg,
     benchmark.setup()
     method = getattr(benchmark, method_name)
 
+    queue.put({'runner_id': runner_cfg['runner_id'],
+               'scenario_cfg': scenario_cfg,
+               'context_cfg': context_cfg})
+
     sla_action = None
     if "sla" in scenario_cfg:
         sla_action = scenario_cfg["sla"].get("action", "assert")
@@ -71,7 +75,7 @@ def _worker_process(queue, cls, method_name, scenario_cfg,
         errors = ""
 
         try:
-            result = method(data)
+            method(data)
         except AssertionError as assertion:
             # SLA validation failed in scenario, determine what to do now
             if sla_action == "assert":
@@ -82,9 +86,6 @@ def _worker_process(queue, cls, method_name, scenario_cfg,
         except Exception as e:
             errors = traceback.format_exc()
             LOG.exception(e)
-        else:
-            if result:
-                output_queue.put(result)
 
         time.sleep(interval)
 
@@ -95,7 +96,10 @@ def _worker_process(queue, cls, method_name, scenario_cfg,
             'errors': errors
         }
 
-        queue.put(benchmark_output)
+        record = {'runner_id': runner_cfg['runner_id'],
+                  'benchmark': benchmark_output}
+
+        queue.put(record)
 
         LOG.debug("runner=%(runner)s seq=%(sequence)s END",
                   {"runner": runner_cfg["runner_id"], "sequence": sequence})
@@ -133,5 +137,5 @@ class SequenceRunner(base.Runner):
         self.process = multiprocessing.Process(
             target=_worker_process,
             args=(self.result_queue, cls, method, scenario_cfg,
-                  context_cfg, self.aborted, self.output_queue))
+                  context_cfg, self.aborted))
         self.process.start()

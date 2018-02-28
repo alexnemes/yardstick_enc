@@ -1,8 +1,6 @@
 from __future__ import absolute_import
 
-import mock
 import os
-import socket
 import unittest
 import tempfile
 
@@ -16,16 +14,7 @@ class APITestCase(unittest.TestCase):
     def setUp(self):
         self.db_fd, self.db_path = tempfile.mkstemp()
         consts.SQLITE = 'sqlite:///{}'.format(self.db_path)
-
-        # server calls gethostbyname which takes 4 seconds, and we should mock it anyway
-        self.socket_mock = mock.patch.dict("sys.modules", {"socket": mock.MagicMock(
-            **{"gethostbyname.return_value": "127.0.0.1", "gethostname.return_value": "localhost"})})
-        self.socket_mock.start()
-        try:
-            from api import server
-        except socket.gaierror:
-            self.app = None
-            return
+        from api import server
 
         server.app.config['TESTING'] = True
         self.app = server.app.test_client()
@@ -35,7 +24,6 @@ class APITestCase(unittest.TestCase):
     def tearDown(self):
         os.close(self.db_fd)
         os.unlink(self.db_path)
-        self.socket_mock.stop()
 
     def _post(self, url, data):
         headers = {'Content-Type': 'application/json'}

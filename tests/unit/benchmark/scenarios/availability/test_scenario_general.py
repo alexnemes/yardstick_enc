@@ -67,5 +67,4 @@ class ScenarioGeneralTestCase(unittest.TestCase):
         ins.director = mock_obj
         ins.director.data = {}
         ins.run({})
-        ins.pass_flag = True
         ins.teardown()

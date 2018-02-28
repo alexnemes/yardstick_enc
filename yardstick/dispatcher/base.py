@@ -38,15 +38,15 @@ class Base(object):
         raise RuntimeError("No such dispatcher_type %s" % dispatcher_type)
 
     @staticmethod
-    def get(config):
+    def get(conf, config):
         """Returns instance of a dispatcher for dispatcher type.
         """
-        list_dispatcher = \
-            [Base.get_cls(out_type.capitalize())(config)
-             for out_type in config['DEFAULT']['dispatcher']]
-
-        return list_dispatcher
+        return Base.get_cls(conf["type"])(conf, config)
 
     @abc.abstractmethod
-    def flush_result_data(self, data):
+    def record_result_data(self, data):
+        """Recording result data interface."""
+
+    @abc.abstractmethod
+    def flush_result_data(self):
         """Flush result data into permanent storage media interface."""

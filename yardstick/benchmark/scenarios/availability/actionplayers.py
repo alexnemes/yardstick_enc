@@ -29,10 +29,8 @@ class AttackerPlayer(ActionPlayer):
 
 class OperationPlayer(ActionPlayer):
 
-    def __init__(self, operation, intermediate_variables):
+    def __init__(self, operation):
         self.underlyingOperation = operation
-        self.underlyingOperation.intermediate_variables \
-            = intermediate_variables
 
     def action(self):
         self.underlyingOperation.run()

@@ -12,6 +12,7 @@ FROM ubuntu:14.04
 LABEL image=opnfv/yardstick
 
 ARG BRANCH=master
+ARG ENC_BRANCH=enc/1.0
 
 # GIT repo directory
 ENV REPOS_DIR /home/opnfv/repos
@@ -22,7 +23,6 @@ ENV IMAGE_DIR /home/opnfv/images/
 # Yardstick repo
 ENV YARDSTICK_REPO_DIR ${REPOS_DIR}/yardstick
 ENV RELENG_REPO_DIR ${REPOS_DIR}/releng
-ENV STORPERF_REPO_DIR ${REPOS_DIR}/storperf
 
 RUN apt-get update && apt-get install -y git python-setuptools python-pip
 RUN easy_install -U setuptools==30.0.0
@@ -31,13 +31,11 @@ RUN pip install appdirs==1.4.0
 RUN mkdir -p ${REPOS_DIR}
 
 RUN git config --global http.sslVerify false
-RUN git clone --depth 1 -b $BRANCH https://gerrit.opnfv.org/gerrit/yardstick ${YARDSTICK_REPO_DIR}
+RUN git clone -b $ENC_BRANCH http://10.0.100.7/cgit/opnfv/yardstick.git ${YARDSTICK_REPO_DIR}
 RUN git clone --depth 1 https://gerrit.opnfv.org/gerrit/releng ${RELENG_REPO_DIR}
-RUN git clone --depth 1 -b $BRANCH https://gerrit.opnfv.org/gerrit/storperf ${STORPERF_REPO_DIR}
 
 WORKDIR ${YARDSTICK_REPO_DIR}
 RUN ${YARDSTICK_REPO_DIR}/install.sh
-RUN ${YARDSTICK_REPO_DIR}/docker/supervisor.sh
 
 RUN echo "daemon off;" >> /etc/nginx/nginx.conf
 

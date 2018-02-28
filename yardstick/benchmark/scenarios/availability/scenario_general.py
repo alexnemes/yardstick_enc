@@ -25,8 +25,6 @@ class ScenarioGeneral(base.Scenario):
             "scenario_cfg:%s context_cfg:%s", scenario_cfg, context_cfg)
         self.scenario_cfg = scenario_cfg
         self.context_cfg = context_cfg
-        self.intermediate_variables = {}
-        self.pass_flag = True
 
     def setup(self):
         self.director = Director(self.scenario_cfg, self.context_cfg)
@@ -40,8 +38,7 @@ class ScenarioGeneral(base.Scenario):
                 orderedSteps.index(step) + 1)
             try:
                 actionPlayer = self.director.createActionPlayer(
-                    step['actionType'], step['actionKey'],
-                    self.intermediate_variables)
+                    step['actionType'], step['actionKey'])
                 actionPlayer.action()
                 actionRollbacker = self.director.createActionRollbacker(
                     step['actionType'], step['actionKey'])
@@ -60,13 +57,10 @@ class ScenarioGeneral(base.Scenario):
 
         verify_result = self.director.verify()
 
-        self.director.store_result(result)
-
         for k, v in self.director.data.items():
             if v == 0:
                 result['sla_pass'] = 0
                 verify_result = False
-                self.pass_flag = False
                 LOG.info(
                     "\033[92m The service process not found in the host \
 envrioment, the HA test case NOT pass")
@@ -78,12 +72,9 @@ envrioment, the HA test case NOT pass")
                 "the HA test case PASS! \033[0m")
         else:
             result['sla_pass'] = 0
-            self.pass_flag = False
             LOG.info(
                 "\033[91m Aoh, the HA test case FAIL,"
                 "please check the detail debug information! \033[0m")
 
     def teardown(self):
         self.director.knockoff()
-
-        assert self.pass_flag, "The HA test case NOT passed"

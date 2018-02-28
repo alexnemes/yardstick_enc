@@ -15,7 +15,7 @@ parameters:
   image:
     type: string
     description: Name of the image
-    default: yardstick-wily-server
+    default: yardstick-dpdk-image
 
   timeout:
     type: number
@@ -34,6 +34,7 @@ resources:
       ram: 4096
       vcpus: 4
       disk: 4
+      extra_specs: {"hw:mem_page_size": "any"}
 
   network:
     type: OS::Neutron::Net
@@ -45,7 +46,7 @@ resources:
     properties:
       name: dpdk_subnet
       ip_version: 4
-      cidr: 192.168.0.0/24
+      cidr: 172.16.101.0/24
       network: { get_resource: network }
 
   management_router:
@@ -107,17 +108,22 @@ resources:
             cat <<'CEOF' > /tmp/dpdk_post_build.sh
             export RTE_SDK=/dpdk
             export RTE_TARGET=x86_64-native-linuxapp-gcc
-            cd /dpdk
+            cd /dpdk/
+            make config T=x86_64-native-linuxapp-gcc O=x86_64-native-linuxapp-gcc
+            cd x86_64-native-linuxapp-gcc/
+            # switch to static libraries so that pktgen can compile
+            sed -i 's/CONFIG_RTE_BUILD_SHARED_LIB=\(.*\)/CONFIG_RTE_BUILD_SHARED_LIB=n/g' .config
+            cd ..
             make install T=x86_64-native-linuxapp-gcc DESTDIR=destdir
             modprobe uio
             insmod /dpdk/x86_64-native-linuxapp-gcc/kmod/igb_uio.ko
             insmod /dpdk/x86_64-native-linuxapp-gcc/kmod/rte_kni.ko
             cd /pktgen-dpdk
-            make RTE_SDK=/dpdk
-            echo "PCKTGEN BUILT"
+            make RTE_SDK=/dpdk/
+            echo "PKTGEN BUILT"
             rm -rf /var/lib/cloud/instances
             echo "rm succesfull"
-            ls /dpdk/x86_64-native-linuxapp-gcc/kmod/
+            ls $RTE_SDK/$RTE_TARGET
             $NOTIFY --data-binary '{"status": "SUCCESS"}'
             CEOF
             chmod +x /tmp/dpdk_post_build.sh

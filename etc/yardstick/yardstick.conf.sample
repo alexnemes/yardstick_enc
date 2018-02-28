@@ -9,7 +9,6 @@
 
 [DEFAULT]
 debug = False
-# setup multiple dipatcher with comma deperted e.g. file,http
 dispatcher = http
 
 [dispatcher_http]
@@ -31,4 +30,3 @@ password = root
 [nsb]
 trex_path=/opt/nsb_bin/trex/scripts
 bin_path=/opt/nsb_bin
-trex_client_lib=/opt/nsb_bin/trex_client/stl

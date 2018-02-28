@@ -47,11 +47,11 @@ class ProcessAttacker(BaseAttacker):
                 stdin=stdin_file)
 
         if stdout:
-            LOG.info("check the environment success!")
+            LOG.info("check the envrioment success!")
             return int(stdout.strip('\n'))
         else:
             LOG.error(
-                "the host environment is error, stdout:%s, stderr:%s",
+                "the host envrioment is error, stdout:%s, stderr:%s",
                 stdout, stderr)
         return False
 

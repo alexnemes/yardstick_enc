@@ -10,14 +10,13 @@
 
 set -e
 
-: ${YARDSTICK_REPO:='https://gerrit.opnfv.org/gerrit/yardstick'}
+: ${YARDSTICK_REPO:='ssh://10.0.100.7:29418/opnfv/yardstick'}
 : ${YARDSTICK_REPO_DIR:='/home/opnfv/repos/yardstick'}
 : ${YARDSTICK_BRANCH:='master'} # branch, tag, sha1 or refspec
 
 : ${RELENG_REPO:='https://gerrit.opnfv.org/gerrit/releng'}
 : ${RELENG_REPO_DIR:='/home/opnfv/repos/releng'}
-# TEMP HACK to freeze releng version to workaround fetch_os_creds.sh problem
-: ${RELENG_BRANCH:='master'} # branch, tag, sha1 or refspec
+: ${RELENG_BRANCH:='abbf19f'} # branch, tag, sha1 or refspec
 
 # git update using reference as a branch.
 # git_update_branch ref
@@ -96,10 +95,8 @@ fi
 cd ${YARDSTICK_REPO_DIR}
 git_checkout ${YARDSTICK_BRANCH}
 
-if [[ "${DEPLOY_SCENARIO:0:2}" == "os" ]];then
-    # setup the environment
-    source ${YARDSTICK_REPO_DIR}/tests/ci/prepare_env.sh
-fi
+# setup the environment
+source ${YARDSTICK_REPO_DIR}/tests/ci/prepare_env.sh
 
 # execute tests
 ${YARDSTICK_REPO_DIR}/tests/ci/yardstick-verify $@

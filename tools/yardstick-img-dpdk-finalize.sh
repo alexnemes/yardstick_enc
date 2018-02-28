@@ -8,7 +8,6 @@
 # http://www.apache.org/licenses/LICENSE-2.0
 ##############################################################################
 
-
 # installs dpdk and pktgen packages on modified image
 
 # PREREQUISITES
@@ -17,10 +16,12 @@
 # must have a public yardstick-key uploaded in openstack
 # must have a proper flavor for the image (i.e. m1.small)
 
-
 stackname="yardstick-modify-stack"
-template=dpdk_install.yml
+template=tools/dpdk_install.yml
 new_image_name="yardstick-image-pktgen-ready"
+
+# delete stack, in case it already exists, to avoid conflict
+openstack stack delete --yes $stackname &> /dev/null || true
 
 openstack stack create $stackname -f yaml -t $template
 progress="WARMING_UP"

@@ -16,7 +16,7 @@ from yardstick.common.utils import cliargs
 from yardstick.cmd.commands import change_osloobj_to_paras
 
 
-class ScenarioCommands(object):     # pragma: no cover
+class ScenarioCommands(object):
     """Scenario commands.
 
        Set of commands to discover and display scenario types.

@@ -7,7 +7,6 @@
 # which accompanies this distribution, and is available at
 # http://www.apache.org/licenses/LICENSE-2.0
 ##############################################################################
-!/bin/sh
 
 set -e
 
@@ -18,7 +17,10 @@ FWD_REV_MAC=$3    # MAC address of forwarding receiver in VM B
 FWD_SEND_MAC=$4   # MAC address of forwarding sender in VM B
 RATE=$5           # packet rate in percentage
 PKT_SIZE=$6       # packet size
+ENS4_IP=$7        # IP address to be statically configured after unbind
+ENS5_IP=$8        # IP address to be statically configured after unbind
 
+DPDK_DIR=/dpdk
 
 load_modules()
 {
@@ -31,13 +33,13 @@ load_modules()
     if lsmod | grep "igb_uio" &> /dev/null ; then
     echo "igb_uio module is loaded"
     else
-    insmod /dpdk/x86_64-native-linuxapp-gcc/kmod/igb_uio.ko
+    insmod ${DPDK_DIR}/x86_64-native-linuxapp-gcc/kmod/igb_uio.ko
     fi
 
     if lsmod | grep "rte_kni" &> /dev/null ; then
     echo "rte_kni module is loaded"
     else
-    insmod /dpdk/x86_64-native-linuxapp-gcc/kmod/rte_kni.ko
+    insmod ${DPDK_DIR}/x86_64-native-linuxapp-gcc/kmod/rte_kni.ko
     fi
 }
 
@@ -48,17 +50,21 @@ change_permissions()
 }
 
 add_interface_to_dpdk(){
+    # putting the last 2 interfaces down
+    enslist=`ifconfig | grep ens | tail -n +2 | awk '{print $1}'`
+    ensarr=(`echo ${enslist}`);
+    for i in {0..1}; do ifconfig ${ensarr[$i]} down; done
+    # adding them to dpdk driver by pci address
     interfaces=$(lspci |grep Eth |tail -n +2 |awk '{print $1}')
-    /dpdk/tools/dpdk-devbind.py --bind=igb_uio $interfaces
-
+    ${DPDK_DIR}/tools/dpdk-devbind.py --bind=igb_uio $interfaces
 }
 
 create_pktgen_config_lua()
 {
-    touch /home/ubuntu/pktgen_latency.lua
+    touch /home/ubuntu/pktgen_latency.lua &> /dev/null
     lua_file="/home/ubuntu/pktgen_latency.lua"
     chmod 777 $lua_file
-    echo $lua_file
+    #echo $lua_file
 
     cat << EOF > "/home/ubuntu/pktgen_latency.lua"
 package.path = package.path ..";?.lua;test/?.lua;app/?.lua;"
@@ -80,7 +86,7 @@ function pktgen_config()
   pktgen.latency("all","enable");
   pktgen.latency("all","on");
 
-  pktgen.start(0);
+  pktgen.start("0");
   end
 
 pktgen_config()
@@ -90,66 +96,89 @@ EOF
 
 create_expect_file()
 {
-    touch /home/ubuntu/pktgen.exp
-    expect_file="/home/ubuntu/pktgen.exp"
+    touch /home/ubuntu/pktgen_latency.exp &> /dev/null
+    expect_file="/home/ubuntu/pktgen_latency.exp"
     chmod 777 $expect_file
-    echo $expect_file
+    #echo $expect_file
 
-    cat << 'EOF' > "/home/ubuntu/pktgen.exp"
+    cat << 'EOF' > "/home/ubuntu/pktgen_latency.exp"
 #!/usr/bin/expect
 
 set blacklist  [lindex $argv 0]
-set log [lindex $argv 1]
-set result {}
-set timeout 15
-spawn ./app/app/x86_64-native-linuxapp-gcc/pktgen -c 0x07 -n 4 -b $blacklist -- -P -m "1.0, 2.1" -f /home/ubuntu/pktgen_latency.lua
-expect "Pktgen>"
-send "\n"
-expect "Pktgen>"
-send "screen on\n"
-expect "Pktgen>"
-set count 10
-while { $count } {
-    send "page latency\n"
-    expect {
-        timeout { send "\n" }
-        -regexp {..*} {
-            set result "${result}$expect_out(0,string)"
-            set timeout 1
-            exp_continue
-         }
-        "Pktgen>"
-    }
-    set count [expr $count-1]
-}
+spawn ./app/app/x86_64-native-linuxapp-gcc/pktgen -c 0x07 -n 4 -b $blacklist -- -P -m "1.0,2.1" -f /home/ubuntu/pktgen_latency.lua
+expect "Pktgen"
+send "on\n"
+expect "Pktgen"
+send "page latency\n"
+expect "Pktgen"
+send "page latency\n"
+expect "Pktgen"
+sleep 1
+send "page latency\n"
+expect "Pktgen"
+send "page latency\n"
+expect "Pktgen"
+sleep 1
+send "page latency\n"
+expect "Pktgen"
+send "page latency\n"
+expect "Pktgen"
+sleep 1
+send "page latency\n"
+expect "Pktgen"
+send "page latency\n"
+expect "Pktgen"
+sleep 1
+send "page latency\n"
+expect "Pktgen"
+send "page latency\n"
+expect "Pktgen"
 send "stop 0\n"
-expect "Pktgen>"
+expect "Pktgen"
+sleep 1
 send "quit\n"
 expect "#"
 
-set file [ open $log w ]
-puts $file $result
+
 EOF
 
+}
+
+free_interfaces()
+{
+
+    interfaces=$(lspci |grep Eth |tail -n +2 |awk '{print $1}')
+    ${DPDK_DIR}/tools/dpdk-devbind.py -u ${interfaces} &> /dev/null
+    ${DPDK_DIR}/tools/dpdk-devbind.py -b virtio-pci ${interfaces} &> /dev/null
+    sleep 3
+    ifconfig ens4 up
+    ifconfig ens5 up
+    #dhclient ens4 &> /dev/null
+    ifconfig ens4 $ENS4_IP netmask 255.255.255.0
+    #dhclient ens5 &> /dev/null
+    ifconfig ens5 $ENS5_IP netmask 255.255.255.0
 }
 
 run_pktgen()
 {
     blacklist=$(lspci |grep Eth |awk '{print $1}'|head -1)
     cd /pktgen-dpdk
-    touch /home/ubuntu/result.log
-    result_log="/home/ubuntu/result.log"
-    sudo expect /home/ubuntu/pktgen.exp $blacklist $result_log
+    touch /home/ubuntu/result_latency.log
+    result_log="/home/ubuntu/result_latency.log"
+    sudo expect /home/ubuntu/pktgen_latency.exp $blacklist > $result_log 2>&1
+    #sudo expect /home/ubuntu/pktgen_latency.exp $blacklist 2>&1 | tee $result_log
 }
 
 main()
 {
+    free_interfaces
     load_modules
     change_permissions
     create_pktgen_config_lua
     create_expect_file
     add_interface_to_dpdk
     run_pktgen
+    free_interfaces
 }
 
 main

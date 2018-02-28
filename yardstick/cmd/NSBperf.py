@@ -30,12 +30,21 @@ from six.moves import input
 
 CLI_PATH = os.path.dirname(os.path.realpath(__file__))
 REPO_PATH = os.path.abspath(os.path.join(CLI_PATH, os.pardir))
+PYTHONPATH = os.environ.get("PYTHONPATH", False)
+VIRTUAL_ENV = os.environ.get("VIRTUAL_ENV", False)
 
 
-def sigint_handler(*args, **kwargs):
+if not PYTHONPATH or not VIRTUAL_ENV:
+    print("Please setup env PYTHONPATH & VIRTUAL_ENV environment varaible.")
+    raise SystemExit(1)
+
+
+def handler():
     """ Capture ctrl+c and exit cli """
     subprocess.call(["pkill", "-9", "yardstick"])
     raise SystemExit(1)
+
+signal.signal(signal.SIGINT, handler)
 
 
 class YardstickNSCli(object):
@@ -108,10 +117,10 @@ class YardstickNSCli(object):
         and generates final report in rst format.
         """
 
-        tc_name = os.path.splitext(test_case)[0]
         report_caption = '{}\n{} ({})\n{}\n\n'.format(
             '================================================================',
-            'Performance report for', tc_name.upper(),
+            'Performance report for',
+            os.path.splitext(test_case)[0].upper(),
             '================================================================')
         print(report_caption)
         if os.path.isfile("/tmp/yardstick.out"):
@@ -120,10 +129,9 @@ class YardstickNSCli(object):
                 lines = jsonutils.load(infile)
 
             if lines:
-                lines = \
-                    lines['result']["testcases"][tc_name]["tc_data"]
+                lines = lines['result']
                 tc_res = lines.pop(len(lines) - 1)
-                for key, value in tc_res["data"].items():
+                for key, value in tc_res["benchmark"]["data"].items():
                     self.generate_kpi_results(key, value)
                     self.generate_nfvi_results(value)
 
@@ -150,7 +158,7 @@ class YardstickNSCli(object):
                 testcases = os.listdir(test_path + vnf)
                 print(("VNF :(%s)" % vnf))
                 print("================")
-                for testcase in [tc for tc in testcases if "tc_" in tc]:
+                for testcase in [tc for tc in testcases if "tc" in tc]:
                     print('%s' % testcase)
                 print(os.linesep)
             raise SystemExit(0)
@@ -206,6 +214,5 @@ class YardstickNSCli(object):
         self.run_test(args, test_path)
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, sigint_handler)
     NS_CLI = YardstickNSCli()
     NS_CLI.main()

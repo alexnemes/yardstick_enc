@@ -1,69 +1,42 @@
-##############################################################################
-# Copyright (c) 2017 Huawei Technologies Co.,Ltd and others.
+# Copyright (c) 2016-2017 Intel Corporation
 #
-# All rights reserved. This program and the accompanying materials
-# are made available under the terms of the Apache License, Version 2.0
-# which accompanies this distribution, and is available at
-# http://www.apache.org/licenses/LICENSE-2.0
-##############################################################################
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 ---
 
 schema: "yardstick:task:0.1"
 description: >
-    Yardstick TC006 config file;
-    Measure volume storage IOPS, throughput and latency using fio with job file.
-
-{% set directory = directory or "/FIO_Test" %}
-{% set volume_size = volume_size or 200 %}
-{% set provider = provider or none %}
-{% set physical_network = physical_network or 'physnet1' %}
-{% set segmentation_id = segmentation_id or none %}
-
-schema: "yardstick:task:0.1"
+    Yardstick TC006 config file.
 
 scenarios:
 -
-  type: Fio
-  options:
-    job_file: "job_file.ini"
-    directory: {{ directory }}
+  type: vtc_throughput
 
-  host: fio.yardstick-TC006
+  options:
+    packet_size: 1280
+    vlan_sender: 2033
+    vlan_receiver: 2040
+    default_net_name: management_network
+    default_subnet_name: management_subnet
+    vlan_net_1_name: apexlake_inbound_network
+    vlan_subnet_1_name: apexlake_inbound_subnet
+    vlan_net_2_name: apexlake_outbound_network
+    vlan_subnet_2_name: apexlake_outbound_subnet
+    vnic_type: direct
+    vtc_flavor: yardstick-flavor
 
   runner:
     type: Iteration
     iterations: 1
-    interval: 1
-
-  sla:
-    read_bw: 6000
-    read_iops: 1500
-    read_lat: 500.1
-    write_bw: 6000
-    write_iops: 1500
-    write_lat: 500.1
-    action: monitor
 
 context:
-  name: yardstick-TC006
-  image: yardstick-image
-  flavor: yardstick-flavor
-  user: ubuntu
-  servers:
-    fio:
-      floating_ip: true
-      volume:
-        name: test-volume
-        size: {{volume_size}}
-      volume_mountpoint: /dev/vdb
-
-  networks:
-    test:
-      cidr: '10.0.1.0/24'
-      {% if provider == "vlan" %}
-      provider: {{provider}}
-      physical_network: {{physical_network}}
-        {% if segmentation_id %}
-      segmentation_id: {{segmentation_id}}
-        {% endif %}
-      {% endif %}
+  type: Dummy

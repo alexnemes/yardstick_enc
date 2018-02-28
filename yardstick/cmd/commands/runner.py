@@ -17,7 +17,7 @@ from yardstick.common.utils import cliargs
 from yardstick.cmd.commands import change_osloobj_to_paras
 
 
-class RunnerCommands(object):   # pragma: no cover
+class RunnerCommands(object):
     """Runner commands.
 
        Set of commands to discover and display runner types.

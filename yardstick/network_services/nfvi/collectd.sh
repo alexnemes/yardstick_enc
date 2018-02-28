@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 INSTALL_NSB_BIN="/opt/nsb_bin"
 cd $INSTALL_NSB_BIN
 
@@ -21,18 +22,8 @@ if [ "$(whoami)" != "root" ]; then
         exit 1;
 fi
 
-echo "setup proxy..."
-if [[ -n $1 ]]; then
-    export http_proxy=$1
-    export https_proxy=$2
-fi
-
-if [[ -n $2 ]]; then
-    export https_proxy=$2
-fi
-
 echo "Install required libraries to run collectd..."
-pkg=(git flex bison build-essential pkg-config automake  autotools-dev libltdl-dev librabbitmq-dev rabbitmq-server cmake libvirt-dev)
+pkg=(git flex bison build-essential pkg-config automake  autotools-dev libltdl-dev librabbitmq-dev rabbitmq-server)
 for i in "${pkg[@]}"; do
 dpkg-query -W --showformat='${Status}\n' "${i}"|grep "install ok installed"
     if [  "$?" -eq "1" ]; then
@@ -41,7 +32,9 @@ dpkg-query -W --showformat='${Status}\n' "${i}"|grep "install ok installed"
 done
 echo "Done"
 
-if ldconfig -p | grep -q libpqos ; then
+ldconfig -p | grep libpqos >/dev/null
+if [ $? -eq 0 ]
+then
     echo "Intel RDT library already installed. Done"
 else
     pushd .
@@ -49,35 +42,8 @@ else
     echo "Get intel_rdt repo and install..."
     rm -rf intel-cmt-cat >/dev/null
     git clone https://github.com/01org/intel-cmt-cat.git
-
-    (cd intel-cmt-cat; make install PREFIX=/usr)
-
-    popd
-    echo "Done."
-fi
-
-if [[ -r /usr/lib/libdpdk.so ]]; then
-    echo "DPDK already installed. Done"
-else
-    pushd .
-
-    echo "Get dpdk and install..."
-    mkdir -p $INSTALL_NSB_BIN
-    pushd dpdk-16.07
-    mkdir -p /mnt/huge
-    mount -t hugetlbfs nodev /mnt/huge
-    sed -i 's/CONFIG_RTE_BUILD_SHARED_LIB=n/CONFIG_RTE_BUILD_SHARED_LIB=y/g' config/common_base
-    sed -i 's/CONFIG_RTE_EAL_PMD_PATH=""/CONFIG_RTE_EAL_PMD_PATH="\/usr\/lib\/dpdk-pmd\/"/g' config/common_base
-
-                echo "Build dpdk v16.07"
-                make config T=x86_64-native-linuxapp-gcc
-                make
-                sudo make install prefix=/usr
-                mkdir -p /usr/lib/dpdk-pmd
-                find /usr/lib -type f -name 'librte_pmd*' | while read path ; do ln -s $path /usr/lib/dpdk-pmd/`echo $path | grep -o 'librte_.*so'` ;  done
-
-                echo "Disable ASLR."
-                echo 0 > /proc/sys/kernel/randomize_va_space
+    pushd intel-cmt-cat
+    git checkout tags/v1.5 -b v1.5
     make install PREFIX=/usr
     popd
 
@@ -85,44 +51,7 @@ else
     echo "Done."
 fi
 
-which $INSTALL_NSB_BIN/yajl > /dev/null
-if [ -f "/usr/local/lib/libyajl.so.2.1.1" ]
-then
-                                echo "ovs stats libs already installed."
-else
-                echo "installing ovs stats libraries"
-                pushd .
-
-                cd $INSTALL_NSB_BIN
-                git clone https://github.com/lloyd/yajl.git
-                pushd yajl
-                ./configure
-                make
-                make install
-                popd
-
-    popd
-fi
-
-ls $INSTALL_NSB_BIN/pmu-tools >/dev/null
-if [ $? -eq 0 ]
-then
-    echo "DPDK already installed. Done"
-else
-    cd $INSTALL_NSB_BIN
-
-    git clone https://github.com/andikleen/pmu-tools.git
-    cd pmu-tools
-    cd jevents
-    sed -i -e 's/CFLAGS := -g -Wall -O2 -Wno-unused-result/CFLAGS := -g -Wall -O2 -Wno-unused-result -fPIC/g'  Makefile
-    make
-    sudo make install
-    cd $INSTALL_NSB_BIN/pmu-tools
-    python event_download.py
-fi
-
-cd $INSTALL_NSB_BIN
-which $INSTALL_NSB_BIN/collectd/collectd >/dev/null
+which /opt/nsb_bin/collectd/collectd >/dev/null
 if [ $? -eq 0 ]
 then
     echo "Collectd already installed. Done"
@@ -133,8 +62,9 @@ else
     git clone https://github.com/collectd/collectd.git
     pushd collectd
     git stash
+    git checkout -b collectd 43a4db3b3209f497a0ba408aebf8aee385c6262d
     ./build.sh
-    ./configure --with-libpqos=/usr/ --with-libdpdk=/usr --with-libyajl=/usr/local --with-libjevents=/usr/local --enable-debug --enable-dpdkstat --enable-virt --enable-ovs_stats --enable-intel_pmu --prefix=$INSTALL_NSB_BIN/collectd
+    ./configure --with-libpqos=/usr/
     make install > /dev/null
     popd
     echo "Done."
@@ -143,7 +73,7 @@ fi
 
 modprobe msr
 cp $INSTALL_NSB_BIN/collectd.conf /opt/collectd/etc/
-sudo service rabbitmq-server restart
+
 echo "Check if admin user already created"
 rabbitmqctl list_users | grep '^admin$' > /dev/null
 if [ $? -eq 0 ];

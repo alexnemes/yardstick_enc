@@ -11,6 +11,7 @@ from __future__ import absolute_import
 import os
 import logging
 import subprocess
+import traceback
 
 import yardstick.ssh as ssh
 from yardstick.benchmark.scenarios.availability.monitor import basemonitor
@@ -26,7 +27,9 @@ def _execute_shell_command(command):
         output = subprocess.check_output(command, shell=True)
     except Exception:
         exitcode = -1
-        LOG.error("exec command '%s' error:\n ", command, exc_info=True)
+        output = traceback.format_exc()
+        LOG.error("exec command '%s' error:\n ", command)
+        LOG.error(traceback.format_exc())
 
     return exitcode, output
 
@@ -63,7 +66,6 @@ class MonitorOpenstackCmd(basemonitor.BaseMonitor):
     def monitor_func(self):
         exit_status = 0
         exit_status, stdout = _execute_shell_command(self.cmd)
-        LOG.debug("Execute command '%s' and the stdout is:\n%s", self.cmd, stdout)
         if exit_status:
             return False
         return True

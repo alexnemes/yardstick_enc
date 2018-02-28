@@ -16,10 +16,10 @@
 from __future__ import absolute_import
 
 from yardstick.network_services.traffic_profile.base import TrafficProfile
-from trex_stl_lib.trex_stl_streams import STLTXCont
-from trex_stl_lib.trex_stl_client import STLStream
-from trex_stl_lib.trex_stl_packet_builder_scapy import STLPktBuilder
-from trex_stl_lib import api as Pkt
+from stl.trex_stl_lib.trex_stl_streams import STLTXCont
+from stl.trex_stl_lib.trex_stl_client import STLStream
+from stl.trex_stl_lib.trex_stl_packet_builder_scapy import STLPktBuilder
+from stl.trex_stl_lib import api as Pkt
 
 
 class FixedProfile(TrafficProfile):
@@ -43,8 +43,7 @@ class FixedProfile(TrafficProfile):
                     self._create_stream(src_ip, dst_ip),
                     ports=[ports])
 
-            traffic_generator.client.start(ports=traffic_generator.my_ports,
-                                           force=True)
+            traffic_generator.client.start(ports=traffic_generator.my_ports)
             self.first_run = False
 
     def _create_stream(self, src_ip, dst_ip):

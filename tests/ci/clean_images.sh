@@ -25,13 +25,14 @@ cleanup()
         return
     fi
 
-    for image in $(openstack ${SECURE} image list | grep -e cirros-0.3.5 -e cirros-d161201 -e yardstick-image -e Ubuntu-16.04 \
+    for image in $(openstack ${SECURE} image list | grep -e cirros-0.3.5 -e yardstick-image -e yardstick-dpdk-image -e yardstick-image-pktgen-ready -e Ubuntu-16.04 \
         | awk '{print $2}'); do
         echo "Deleting image $image..."
         openstack ${SECURE} image delete $image || true
     done
 
     openstack ${SECURE} flavor delete yardstick-flavor &> /dev/null || true
+    openstack ${SECURE} flavor delete yardstick-dpdk-flavor &> /dev/null || true
     openstack ${SECURE} flavor delete storperf &> /dev/null || true
 }
 

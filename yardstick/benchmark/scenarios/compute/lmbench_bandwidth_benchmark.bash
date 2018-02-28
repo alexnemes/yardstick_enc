@@ -29,7 +29,9 @@ output_json()
 }
 
 if [ "${NODE_CPU_ARCH}" == "aarch64" ]; then
-    /usr/lib/lmbench/bin/bw_mem -W $WARMUP ${SIZE}k $TEST_NAME 2>&1 | output_json
+    REL_PATH="bw_mem"
 else
-    /usr/lib/lmbench/bin/x86_64-linux-gnu/bw_mem -W $WARMUP ${SIZE}k $TEST_NAME 2>&1 | output_json
+    REL_PATH="x86_64-linux-gnu/bw_mem"
 fi
+
+/usr/lib/lmbench/bin/${REL_PATH} -W $WARMUP ${SIZE}k $TEST_NAME 2>&1 | output_json
