@@ -9,10 +9,9 @@
 
 FROM ubuntu:14.04
 
-LABEL image=opnfv/yardstick
+LABEL image=opnfv/yardstick_enc
 
 ARG BRANCH=master
-ARG ENC_BRANCH=enc/1.0
 
 # GIT repo directory
 ENV REPOS_DIR /home/opnfv/repos
@@ -21,7 +20,7 @@ ENV IMAGE_DIR /home/opnfv/images/
 # Set work directory
 
 # Yardstick repo
-ENV YARDSTICK_REPO_DIR ${REPOS_DIR}/yardstick
+ENV YARDSTICK_REPO_DIR ${REPOS_DIR}/yardstick_enc
 ENV RELENG_REPO_DIR ${REPOS_DIR}/releng
 
 RUN apt-get update && apt-get install -y git python-setuptools python-pip
@@ -31,7 +30,7 @@ RUN pip install appdirs==1.4.0
 RUN mkdir -p ${REPOS_DIR}
 
 RUN git config --global http.sslVerify false
-RUN git clone -b $ENC_BRANCH http://10.0.100.7/cgit/opnfv/yardstick.git ${YARDSTICK_REPO_DIR}
+RUN git clone --depth 1 -b $BRANCH https://github.com/alexnemes/yardstick_enc.git ${YARDSTICK_REPO_DIR}
 RUN git clone --depth 1 https://gerrit.opnfv.org/gerrit/releng ${RELENG_REPO_DIR}
 
 WORKDIR ${YARDSTICK_REPO_DIR}
