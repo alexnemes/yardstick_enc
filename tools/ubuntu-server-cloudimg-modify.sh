@@ -82,5 +82,11 @@ bash build.sh
 
 git clone https://github.com/beefyamoeba5/cachestat.git "${CLONE_DEST}/Cachestat"
 
+wget http://myownlittleworld.com/miscellaneous/computers/files/pi_css5/pi_css5_src.tgz 
+cd "${CLONE_DEST}"
+tar -zxvf pi_css5_src.tgz 
+cd pi_css5_src 
+gcc -O -funroll-loops -fomit-frame-pointer pi_fftcs.c fftsg_h.c -lm -o pi_css5 
+
 # restore symlink
 ln -sf /run/resolvconf/resolv.conf /etc/resolv.conf
